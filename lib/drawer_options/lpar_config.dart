@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:ctdm/utils/log_utils.dart';
+import 'package:ctdm/utils/wiimm_tools.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:url_launcher/url_launcher_string.dart';
@@ -25,9 +26,9 @@ class _LparConfigState extends State<LparConfig> {
   void createLparFile(String packPath) async {
     if (!File(path.join(packPath, 'lpar.txt')).existsSync()) {
       try {
-        final _ = await Process.run('wlect',
+        final _ = await Process.run(resolveWiimmTool('wlect'),
             ['create', 'lpar', '--dest', path.join(packPath, 'lpar.txt')],
-            runInShell: true);
+            runInShell: false);
       } on Exception catch (_) {
         logString(LogType.ERROR, _.toString());
       }
