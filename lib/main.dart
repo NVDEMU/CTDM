@@ -34,13 +34,15 @@ void main() {
 class NotifyErrorWidget extends StatelessWidget {
   final CtdmException error;
   final String stacktrace;
+  final Future<String> _errorDefinitions =
+      rootBundle.loadString('assets/errors.json');
   const NotifyErrorWidget(
       {super.key, required this.error, required this.stacktrace});
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<String>(
-      future: rootBundle.loadString('assets/errors.json'),
+      future: _errorDefinitions,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return MaterialApp(
