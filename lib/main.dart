@@ -16,6 +16,9 @@ import 'package:path/path.dart' as path;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+final Future<String> _ctdmErrorDefinitions =
+    rootBundle.loadString('assets/errors.json');
+
 void main() {
   runZonedGuarded(() => _main(), (error, stackTrace) {
     if (error.runtimeType != CtdmException) {
@@ -34,15 +37,13 @@ void main() {
 class NotifyErrorWidget extends StatelessWidget {
   final CtdmException error;
   final String stacktrace;
-  final Future<String> _errorDefinitions =
-      rootBundle.loadString('assets/errors.json');
   const NotifyErrorWidget(
       {super.key, required this.error, required this.stacktrace});
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<String>(
-      future: _errorDefinitions,
+      future: _ctdmErrorDefinitions,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return MaterialApp(
