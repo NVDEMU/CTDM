@@ -104,10 +104,20 @@ class _StudioHomeState extends State<StudioHome> {
   }
 
   Future<void> _chooseWorkspace() async {
-    final selected = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: 'Choose your distribution workspace',
-    );
-    if (selected == null || selected.isEmpty) return;
+    String? selected;
+    try {
+      selected = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Choose your distribution workspace',
+      );
+    } on Object catch (error, stackTrace) {
+      // The previous FilePicker release could fail on macOS without giving
+      // users any visible indication. Surface the platform error instead of
+      // letting a button appear to do nothing.
+      debugPrint('Workspace picker failed: $error\n$stackTrace');
+      _showMessage('Could not open the folder picker: $error');
+      return;
+    }
+    if (!mounted || selected == null || selected.isEmpty) return;
 
     try {
       for (final folder in ['Packs', 'myTracks', 'myMusic', 'myCharacters']) {
@@ -119,6 +129,9 @@ class _StudioHomeState extends State<StudioHome> {
       _showMessage('Workspace selected.');
     } on FileSystemException catch (error) {
       _showMessage('Could not prepare that folder: ' + error.message);
+    } on Object catch (error, stackTrace) {
+      debugPrint('Workspace setup failed: $error\n$stackTrace');
+      _showMessage('Workspace setup failed: $error');
     }
   }
 
@@ -128,13 +141,20 @@ class _StudioHomeState extends State<StudioHome> {
       return;
     }
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['iso', 'wbfs'],
-      allowMultiple: false,
-      dialogTitle: 'Select your Mario Kart Wii ISO or WBFS',
-    );
-    if (result == null || result.files.isEmpty) return;
+    FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['iso', 'wbfs'],
+        allowMultiple: false,
+        dialogTitle: 'Select your Mario Kart Wii ISO or WBFS',
+      );
+    } on Object catch (error, stackTrace) {
+      debugPrint('Game image picker failed: $error\n$stackTrace');
+      _showMessage('Could not open the ISO/WBFS picker: $error');
+      return;
+    }
+    if (!mounted || result == null || result.files.isEmpty) return;
     final source = result.files.single.path;
     if (source == null || source.isEmpty) {
       _showMessage('The selected file path could not be read.');
