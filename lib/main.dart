@@ -27,9 +27,7 @@ void main() {
 
     runApp(NotifyErrorWidget(
         error: error as CtdmException,
-        stacktrace: stackTrace.toString(),
-        jsonStringPath: path.join(path.dirname(Platform.resolvedExecutable),
-            "data", "flutter_assets", "assets", "errors.json")));
+        stacktrace: stackTrace.toString()));
   });
 }
 
