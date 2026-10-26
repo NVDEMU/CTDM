@@ -316,7 +316,19 @@ Future<void> _main() async {
         minor != null &&
         (major < 2 || (major == 2 && minor < 33));
 
-    if (result.exitCode != 0 || major == null || minor == null) {
+    final bool looksLikeWlect = RegExp(
+      r'(wlect|LE-CODE|Wiimm)',
+      caseSensitive: false,
+    ).hasMatch(versionOutput);
+
+    if (result.exitCode == 0 &&
+        (major != null && minor != null && !versionIsTooOld ||
+            Platform.isMacOS && looksLikeWlect)) {
+      // The installed Mac tool has been verified to run, but output formats
+      // differ between Wiimm builds. Do not block the Mac UI because a banner
+      // cannot be parsed; actual tool invocation will report real failures.
+      await prefs.setBool('szs', true);
+    } else if (result.exitCode != 0 || major == null || minor == null) {
       await prefs.setBool('szs', false);
       logString(
         LogType.ERROR,
