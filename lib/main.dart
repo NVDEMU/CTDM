@@ -296,34 +296,36 @@ Future<void> _main() async {
   await prefs.setString('profile', profile);
 
   try {
-    ProcessResult p =
+    final ProcessResult result =
         await Process.run('wlect', ['--version'], runInShell: true);
-    if (p.exitCode == 1) {
-      //error in executing wlect --version
-      prefs.setBool('szs', false);
-      logString(LogType.ERROR, "Wiimms' szs toolset not found.");
+    final RegExpMatch? versionMatch = RegExp(
+      r'LE-CODE Tool v([0-9]+\.[0-9]+)',
+    ).firstMatch(result.stdout.toString());
+    final double? version = versionMatch == null
+        ? null
+        : double.tryParse(versionMatch.group(1)!);
+
+    if (result.exitCode != 0 || version == null) {
+      await prefs.setBool('szs', false);
+      logString(
+        LogType.ERROR,
+        "Wiimm's LE-CODE tool (wlect) was not found or its version could not be read.",
+      );
+    } else if (version < 2.33) {
+      await prefs.setBool('szs', false);
+      logString(
+        LogType.ERROR,
+        "Wiimm's LE-CODE tool is too old. Please update it.",
+      );
     } else {
-      double version = double.parse(p.stdout
-          .toString()
-          .split(RegExp(r'LE-CODE Tool v'))[1]
-          .substring(0, 4));
-      if (version < 2.33) {
-        //https://szs.wiimm.de/changelog.html
-        //2.36 when --9-laps will be implemented.
-
-        prefs.setBool('szs', false);
-        logString(LogType.ERROR,
-            "Wiimms' szs toolset version too old. Please update.");
-      } else {
-        prefs.setBool('szs', true);
-      }
+      await prefs.setBool('szs', true);
     }
-  } on Exception catch (_) {
-    //(there is no whay this expection will be thrown)
-
-    //print("Wiimms' szs toolset not found");
-    prefs.setBool('szs', false);
-    logString(LogType.ERROR, "Wiimms' szs toolset not found?");
+  } catch (error) {
+    await prefs.setBool('szs', false);
+    logString(
+      LogType.ERROR,
+      "Wiimm's LE-CODE tool (wlect) is unavailable: $error",
+    );
   }
 
   try {
