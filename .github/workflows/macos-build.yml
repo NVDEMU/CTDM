@@ -56,17 +56,21 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Contents/Info.plist"
           file "$APP_PATH"/Contents/MacOS/*
 
-      - name: Package app
+      - name: Package app as ZIP and DMG
         env:
           APP_PATH: ${{ steps.app.outputs.app_path }}
         run: |
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" CTDM-macOS-arm64.zip
-          shasum -a 256 CTDM-macOS-arm64.zip
+          hdiutil create -volname "CTDM" -srcfolder "$APP_PATH" -ov -format UDZO CTDM-macOS-arm64.dmg
+          shasum -a 256 CTDM-macOS-arm64.zip CTDM-macOS-arm64.dmg
+          du -sh "$APP_PATH" CTDM-macOS-arm64.zip CTDM-macOS-arm64.dmg
 
-      - name: Upload app bundle
+      - name: Upload macOS app packages
         uses: actions/upload-artifact@v4
         with:
           name: CTDM-macOS-arm64
-          path: CTDM-macOS-arm64.zip
+          path: |
+            CTDM-macOS-arm64.zip
+            CTDM-macOS-arm64.dmg
           if-no-files-found: error
           retention-days: 14
