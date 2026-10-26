@@ -2,6 +2,7 @@ import 'package:ctdm/utils/exceptions_utils.dart';
 import 'package:ctdm/utils/log_utils.dart';
 import 'package:desktop_window/desktop_window.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,18 +36,40 @@ void main() {
 class NotifyErrorWidget extends StatelessWidget {
   final CtdmException error;
   final String stacktrace;
-  final String jsonStringPath;
   const NotifyErrorWidget(
-      {super.key,
-      required this.error,
-      required this.stacktrace,
-      required this.jsonStringPath});
+      {super.key, required this.error, required this.stacktrace});
 
   @override
   Widget build(BuildContext context) {
-    String jsonString = File(jsonStringPath).readAsStringSync();
-    CtdmError? ctdmError = error.getDetailedError(jsonString);
-    return MaterialApp(
+    return FutureBuilder<String>(
+      future: rootBundle.loadString('assets/errors.json'),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'CTDM startup error',
+            theme: ThemeData(
+              brightness: Brightness.dark,
+              scaffoldBackgroundColor: const Color(0xFF202020),
+            ),
+            home: Scaffold(
+              body: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    snapshot.hasError
+                        ? 'CTDM encountered a startup error, and its error details could not be loaded.\n\n$stacktrace'
+                        : 'Loading CTDM error details…',
+                    textAlign: TextAlign.left,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        final CtdmError ctdmError = error.getDetailedError(snapshot.data!);
+        return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'CTDM',
       theme: ThemeData(
@@ -227,6 +250,8 @@ class NotifyErrorWidget extends StatelessWidget {
         ),
       ),
     );
+      },
+    );
   }
 }
 
@@ -311,15 +336,15 @@ Future<void> _main() async {
   }
 
   // defaultSettingsValues.remove('dolphin');
-  defaultSettingsValues.forEach((key, value) async {
-    if (!prefs.containsKey(key)) {
-      if (['debug'].contains(key)) {
-        await prefs.setBool(key, value);
+  for (final entry in defaultSettingsValues.entries) {
+    if (!prefs.containsKey(entry.key)) {
+      if (entry.value is bool) {
+        await prefs.setBool(entry.key, entry.value as bool);
       } else {
-        await prefs.setString(key, value);
+        await prefs.setString(entry.key, entry.value.toString());
       }
     }
-  });
+  }
   // //await DesktopWindow.setMinWindowSize(const Size(1300, 800));
   // double devicePixelRatio = MediaQueryData.fromView(WidgetsBinding.instance.window).devicePixelRatio;
   // DesktopWindow.setMinWindowSize(
@@ -417,12 +442,12 @@ class _MyHomePageState extends State<MyHomePage> {
     prefs = await SharedPreferences.getInstance();
 
     setState(() {
-      szsFound = prefs.getBool('szs')!;
-      workspace = prefs.getString('workspace')!;
+      szsFound = prefs.getBool('szs') ?? false;
+      workspace = prefs.getString('workspace') ?? '';
       if (workspace != '' && !Directory(workspace).existsSync()) {
         workspace = '';
       }
-      witFound = prefs.getBool('wit')!;
+      witFound = prefs.getBool('wit') ?? false;
     });
     String version = prefs.getString('version')!;
 
