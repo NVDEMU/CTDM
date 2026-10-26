@@ -305,7 +305,7 @@ Future<void> _main() async {
     final String versionOutput =
         '${result.stdout}\n${result.stderr}';
     final RegExpMatch? versionMatch = RegExp(
-      r'LE-CODE\\s+Tool\\s+v([0-9]+)\\.([0-9]+)',
+      r'LE-CODE\s+Tool\s+v([0-9]+)\.([0-9]+)',
       caseSensitive: false,
     ).firstMatch(versionOutput);
     final int? major =
