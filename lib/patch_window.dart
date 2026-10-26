@@ -268,7 +268,7 @@ Future<String> createBMGList(String packPath) async {
   }
   // try {
   ProcessResult p = await Process.run(
-      'wctct',
+      resolveWiimmTool('wctct'),
       [
         'create',
         'bmg',
@@ -1389,7 +1389,7 @@ Future<File> extractSzsAndDecode(
       runInShell: true);
 
   await Process.run(
-      'wbmgt',
+      resolveWiimmTool('wbmgt'),
       [
         'decode',
         path.join(dirPath, 'message', 'Common.bmg'),
@@ -1402,7 +1402,7 @@ Future<File> extractSzsAndDecode(
 
 Future<void> encodeAndClose(File commonTxt, File f) async {
   await Process.run(
-      'wbmgt',
+      resolveWiimmTool('wbmgt'),
       [
         'encode',
         commonTxt.path,
