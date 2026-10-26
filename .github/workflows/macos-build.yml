@@ -104,14 +104,25 @@ jobs:
           mpv: https://mpv.io/ (source and licensing)
           NOTICE
 
-      - name: Re-sign and verify modified app bundle
+      - name: Sign bundled command-line tools and final app bundle
         env:
           APP_PATH: ${{ steps.app.outputs.app_path }}
         run: |
           set -euo pipefail
-          # The workflow renames the app and adds bundled tools after Flutter's
-          # build, invalidating the original signature. Sign the final bundle.
-          codesign --force --deep --sign - "$APP_PATH"
+          TOOL_ROOT="$APP_PATH/Contents/Resources/CTDM-tools"
+
+          # Sign loose Mach-O helpers individually first. --deep can rewrite
+          # nested code signatures and is not appropriate for these loose tools.
+          while IFS= read -r -d '' candidate; do
+            if file "$candidate" | grep -q 'Mach-O'; then
+              echo "Signing bundled tool: $candidate"
+              codesign --force --sign - "$candidate"
+            fi
+          done < <(find "$TOOL_ROOT" -type f -print0)
+
+          # Xcode already signed the Flutter frameworks; sign only the outer
+          # app so the command-line tools' just-created signatures are kept.
+          codesign --force --sign - "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
       - name: Verify bundled WIT after final signing
