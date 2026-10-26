@@ -3,10 +3,13 @@ import 'dart:io';
 
 import 'package:ctdm/utils/exceptions_utils.dart';
 import 'package:ctdm/utils/log_utils.dart';
+import 'package:ctdm/utils/wiimm_tools.dart';
 import 'package:path/path.dart' as path;
 
-String ffmpegPath = "ffmpeg";
-String mpvPath = "mpv";
+// Resolve dependencies explicitly for apps launched from Finder, which do not
+// inherit the interactive shell's PATH from ~/.zshrc.
+String ffmpegPath = resolveWiimmTool("ffmpeg");
+String mpvPath = resolveWiimmTool("mpv");
 
 bool isFastBrstm(String path) {
   return path.endsWith('_f.brstm') ||
