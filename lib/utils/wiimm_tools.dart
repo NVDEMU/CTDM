@@ -15,6 +15,10 @@ String resolveWiimmTool(String executable) {
       path.join(home, 'Tools', 'WiimmSZS'),
     if (home != null && home.isNotEmpty)
       path.join(home, 'Tools', 'WiimmISO'),
+    if (home != null && home.isNotEmpty)
+      path.join(home, 'Tools', 'mpv'),
+    if (home != null && home.isNotEmpty)
+      path.join(home, 'Tools', 'FFmpeg'),
   ];
 
   for (final root in roots) {
