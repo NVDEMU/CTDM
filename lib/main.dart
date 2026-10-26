@@ -296,27 +296,39 @@ Future<void> _main() async {
   const profile = String.fromEnvironment('profile');
   await prefs.setString('profile', profile);
 
+  final String wlectPath = resolveWiimmTool('wlect');
   try {
+    // On macOS, some command-line builds print their version banner to stderr.
+    // Read both streams so a working tool is not falsely reported as missing.
     final ProcessResult result =
-        await Process.run(resolveWiimmTool('wlect'), ['--version'], runInShell: true);
+        await Process.run(wlectPath, ['--version'], runInShell: false);
+    final String versionOutput =
+        '${result.stdout}\n${result.stderr}';
     final RegExpMatch? versionMatch = RegExp(
-      r'LE-CODE Tool v([0-9]+\.[0-9]+)',
-    ).firstMatch(result.stdout.toString());
-    final double? version = versionMatch == null
-        ? null
-        : double.tryParse(versionMatch.group(1)!);
+      r'LE-CODE\\s+Tool\\s+v([0-9]+)\\.([0-9]+)',
+      caseSensitive: false,
+    ).firstMatch(versionOutput);
+    final int? major =
+        versionMatch == null ? null : int.tryParse(versionMatch.group(1)!);
+    final int? minor =
+        versionMatch == null ? null : int.tryParse(versionMatch.group(2)!);
+    final bool versionIsTooOld = major != null &&
+        minor != null &&
+        (major < 2 || (major == 2 && minor < 33));
 
-    if (result.exitCode != 0 || version == null) {
+    if (result.exitCode != 0 || major == null || minor == null) {
       await prefs.setBool('szs', false);
       logString(
         LogType.ERROR,
-        "Wiimm's LE-CODE tool (wlect) was not found or its version could not be read.",
+        "Could not verify wlect at '$wlectPath'. Exit code: ${result.exitCode}. "
+        "stdout: ${result.stdout}. stderr: ${result.stderr}",
       );
-    } else if (version < 2.33) {
+    } else if (versionIsTooOld) {
       await prefs.setBool('szs', false);
       logString(
         LogType.ERROR,
-        "Wiimm's LE-CODE tool is too old. Please update it.",
+        "Wiimm's LE-CODE tool at '$wlectPath' is too old "
+        "(detected v$major.$minor; need v2.33 or newer).",
       );
     } else {
       await prefs.setBool('szs', true);
@@ -325,7 +337,7 @@ Future<void> _main() async {
     await prefs.setBool('szs', false);
     logString(
       LogType.ERROR,
-      "Wiimm's LE-CODE tool (wlect) is unavailable: $error",
+      "Wiimm's LE-CODE tool at '$wlectPath' could not be started: $error",
     );
   }
 
