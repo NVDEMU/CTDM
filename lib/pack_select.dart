@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:ctdm/utils/wiimm_tools.dart';
 import 'package:ctdm/pack_editor.dart';
 import 'package:ctdm/utils/exceptions_utils.dart';
 import 'package:ctdm/utils/log_utils.dart';
@@ -20,7 +21,7 @@ Future<int> extractIso(String source, String dest) async {
     return 1;
   }
   final process =
-      await Process.start('wit', ['EXTRACT', source, dest], runInShell: true);
+      await Process.start(resolveWiimmTool('wit'), ['EXTRACT', source, dest], runInShell: true);
   final exitCode = await process.exitCode;
   if (exitCode != 0) {
     logString(LogType.ERROR, "ERROR 1001: cannot extract $source to $dest");
@@ -28,7 +29,7 @@ Future<int> extractIso(String source, String dest) async {
         StackTrace.current, "1001");
   }
   ProcessResult checkKoreanIso = await Process.run(
-      'wit', ['dump', source, '--show', 'D-ID'],
+      resolveWiimmTool('wit'), ['dump', source, '--show', 'D-ID'],
       runInShell: true);
   if (checkKoreanIso.stdout.toString().contains('RMCK01')) {
     String originalDiscPath = dest;
