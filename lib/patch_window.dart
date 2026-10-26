@@ -585,7 +585,7 @@ class _PatchWindowState extends State<PatchWindow> {
       String regionContent = readRegionFile(packPath);
       if (regionContent != "" && isOnline) {
         await Process.run(
-            'wstrt',
+            resolveWiimmTool('wstrt'),
             [
               'patch',
               '--add-lecode',
@@ -602,7 +602,7 @@ class _PatchWindowState extends State<PatchWindow> {
             runInShell: false);
 
         await Process.run(
-            'wstrt',
+            resolveWiimmTool('wstrt'),
             [
               'patch',
               '--region',
@@ -617,7 +617,7 @@ class _PatchWindowState extends State<PatchWindow> {
       } else {
         // wstrt patch --add-lecode main.dol
         await Process.run(
-            'wstrt',
+            resolveWiimmTool('wstrt'),
             [
               'patch',
               '--add-lecode',
