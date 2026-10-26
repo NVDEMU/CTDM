@@ -1,5 +1,6 @@
 import 'package:ctdm/utils/exceptions_utils.dart';
 import 'package:ctdm/utils/log_utils.dart';
+import 'package:ctdm/utils/wiimm_tools.dart';
 import 'package:desktop_window/desktop_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -297,7 +298,7 @@ Future<void> _main() async {
 
   try {
     final ProcessResult result =
-        await Process.run('wlect', ['--version'], runInShell: true);
+        await Process.run(resolveWiimmTool('wlect'), ['--version'], runInShell: true);
     final RegExpMatch? versionMatch = RegExp(
       r'LE-CODE Tool v([0-9]+\.[0-9]+)',
     ).firstMatch(result.stdout.toString());
@@ -329,13 +330,13 @@ Future<void> _main() async {
   }
 
   try {
-    final _ = await Process.start('wit', [], runInShell: false);
+    final _ = await Process.start(resolveWiimmTool('wit'), [], runInShell: false);
 
-    prefs.setBool('wit', true);
+    await prefs.setBool('wit', true);
   } on Exception catch (_) {
     //print("Wiimms' wit toolset not found");
     logString(LogType.ERROR, "Wiimms' wit toolset not found");
-    prefs.setBool('wit', false);
+    await prefs.setBool('wit', false);
   }
 
   // defaultSettingsValues.remove('dolphin');
