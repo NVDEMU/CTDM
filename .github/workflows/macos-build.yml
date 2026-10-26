@@ -125,15 +125,45 @@ jobs:
           codesign --force --sign - "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
-      - name: Verify bundled WIT after final signing
+      - name: Verify signatures and launch bundled tools
         env:
           APP_PATH: ${{ steps.app.outputs.app_path }}
         run: |
           set -euo pipefail
-          WIT="$(find "$APP_PATH/Contents/Resources/CTDM-tools/wit" -type f -name wit -print -quit)"
+          TOOL_ROOT="$APP_PATH/Contents/Resources/CTDM-tools"
+
+          # Verify every Mach-O file under the embedded tool directory after
+          # signing the outer app. This catches nested code whose signature
+          # was accidentally changed by a later packaging step.
+          MACHO_COUNT=0
+          while IFS= read -r -d '' candidate; do
+            if file "$candidate" | grep -q 'Mach-O'; then
+              echo "Verifying signature: $candidate"
+              codesign --verify --strict --verbose=2 "$candidate"
+              MACHO_COUNT=$((MACHO_COUNT + 1))
+            fi
+          done < <(find "$TOOL_ROOT" -type f -print0)
+          test "$MACHO_COUNT" -gt 0
+          echo "Verified $MACHO_COUNT bundled Mach-O files."
+
+          find_tool() {
+            find "$TOOL_ROOT" \( -type f -o -type l \) -name "$1" -print -quit
+          }
+
+          WIT="$(find_tool wit)"
+          WLECT="$(find_tool wlect)"
+          FFmpeg="$(find_tool ffmpeg)"
+          FFPROBE="$(find_tool ffprobe)"
           test -n "$WIT"
+          test -n "$WLECT"
+          test -n "$FFmpeg"
+          test -n "$FFPROBE"
+
           "$WIT" --version
-          codesign --verify --strict --verbose=2 "$WIT"
+          "$WLECT" --version
+          "$FFmpeg" -version >/dev/null
+          "$FFPROBE" -version >/dev/null
+          echo "WIT, WLECT, FFmpeg and FFprobe all launch after final signing."
 
       - name: Verify release is not App-Sandboxed
         env:
