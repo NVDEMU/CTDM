@@ -1,0 +1,67 @@
+name: Build CTDM for macOS
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - '.github/workflows/macos-build.yml'
+      - 'lib/**'
+      - 'macos/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ctdm-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-macos:
+    # macos-15 is an Apple Silicon hosted runner; build an arm64-native app.
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show toolchain
+        run: |
+          flutter --version
+          dart --version
+          xcodebuild -version
+          uname -m
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build macOS app
+        run: flutter build macos --release
+
+      - name: Verify app bundle
+        run: |
+          test -d build/macos/Build/Products/Release/ctdm.app
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' build/macos/Build/Products/Release/ctdm.app/Contents/Info.plist
+          file build/macos/Build/Products/Release/ctdm.app/Contents/MacOS/*
+
+      - name: Package app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/ctdm.app CTDM-macOS-arm64.zip
+          shasum -a 256 CTDM-macOS-arm64.zip
+
+      - name: Upload app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: CTDM-macOS-arm64
+          path: CTDM-macOS-arm64.zip
+          if-no-files-found: error
+          retention-days: 14
