@@ -44,7 +44,7 @@ Future<int> extractIso(String source, String dest) async {
     // discarded the useful reason when extraction failed.
     final ProcessResult process = await Process.run(
       witPath,
-      ['EXTRACT', source, dest],
+      ['EXTRACT', '--source', source, '--DEST', dest],
       runInShell: false,
     );
 
