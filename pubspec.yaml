@@ -42,7 +42,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   shared_preferences: ^2.0.18
   url_launcher: ^6.1.11
-  file_picker: ^5.2.6
+  file_picker: ^10.3.10
   path: ^1.8.2
   loading_animation_widget: ^1.2.0+4
   desktop_window: ^0.4.0
