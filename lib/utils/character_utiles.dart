@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:ctdm/drawer_options/custom_files.dart';
 import 'package:ctdm/utils/exceptions_utils.dart';
 import 'package:ctdm/utils/log_utils.dart';
+import 'package:ctdm/utils/wiimm_tools.dart';
 import 'package:path/path.dart' as path;
 import 'dart:math';
 
@@ -203,7 +204,7 @@ patchSzsWithImages(String packPath, Directory extractedSzs,
               type: "custom characters");
         }
         await Process.run(
-            'wimgt',
+            resolveWiimmTool('wimgt'),
             [
               'encode',
               path.join(dir64.path, "$filenameTpl.png"),
@@ -211,7 +212,7 @@ patchSzsWithImages(String packPath, Directory extractedSzs,
               path.join(dir64.path, filenameTpl),
               '-o'
             ],
-            runInShell: true);
+            runInShell: false);
       }
     } else {
       logString(
@@ -233,7 +234,7 @@ patchSzsWithImages(String packPath, Directory extractedSzs,
               type: "custom characters");
         }
         await Process.run(
-            'wimgt',
+            resolveWiimmTool('wimgt'),
             [
               'encode',
               path.join(dir32.path, "$filenameTpl.png"),
@@ -241,7 +242,7 @@ patchSzsWithImages(String packPath, Directory extractedSzs,
               path.join(dir32.path, filenameTpl),
               '-o',
             ],
-            runInShell: true);
+            runInShell: false);
       }
     } else {
       logString(
@@ -252,7 +253,7 @@ patchSzsWithImages(String packPath, Directory extractedSzs,
   }
   String fileBaseName = path.basename(getFileFromIndex(packPath, index).path);
   await Process.run(
-      'wszst',
+      resolveWiimmTool('wszst'),
       [
         'CREATE',
         extractedSzs.path,
@@ -260,7 +261,7 @@ patchSzsWithImages(String packPath, Directory extractedSzs,
         '--dest',
         path.join(path.dirname(extractedSzs.path), fileBaseName)
       ],
-      runInShell: true);
+      runInShell: false);
   return;
 }
 
