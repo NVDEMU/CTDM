@@ -56,6 +56,47 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Contents/Info.plist"
           file "$APP_PATH"/Contents/MacOS/*
 
+      - name: Bundle Wiimm and media tools inside app
+        env:
+          APP_PATH: ${{ steps.app.outputs.app_path }}
+        run: |
+          set -euo pipefail
+          TOOL_ROOT="$APP_PATH/Contents/Resources/CTDM-tools"
+          mkdir -p "$TOOL_ROOT/szs" "$TOOL_ROOT/wit" "$TOOL_ROOT/ffmpeg" "$TOOL_ROOT/mpv"
+
+          curl -fL --retry 3 "https://szs.wiimm.de/download/szs-v2.42a-r8989-mac64.tar.gz" -o "$RUNNER_TEMP/szs.tar.gz"
+          tar -xzf "$RUNNER_TEMP/szs.tar.gz" -C "$TOOL_ROOT/szs"
+
+          curl -fL --retry 3 "https://wit.wiimm.de/download/wit-v3.05a-r8638-mac.tar.gz" -o "$RUNNER_TEMP/wit.tar.gz"
+          tar -xzf "$RUNNER_TEMP/wit.tar.gz" -C "$TOOL_ROOT/wit"
+
+          curl -fL --retry 3 "https://github.com/binmgr/ffmpeg/releases/latest/download/ffmpeg-darwin-arm64.tar.gz" -o "$RUNNER_TEMP/ffmpeg-darwin-arm64.tar.gz"
+          curl -fL --retry 3 "https://github.com/binmgr/ffmpeg/releases/latest/download/SHA256SUMS.txt" -o "$RUNNER_TEMP/ffmpeg-SHA256SUMS.txt"
+          grep 'ffmpeg-darwin-arm64.tar.gz' "$RUNNER_TEMP/ffmpeg-SHA256SUMS.txt" | (cd "$RUNNER_TEMP" && shasum -a 256 -c -)
+          tar -xzf "$RUNNER_TEMP/ffmpeg-darwin-arm64.tar.gz" -C "$TOOL_ROOT/ffmpeg" ffmpeg ffprobe
+
+          curl -fL --retry 3 "https://laboratory.stolendata.net/~djinn/mpv_osx/mpv-arm64-latest.tar.gz" -o "$RUNNER_TEMP/mpv-arm64.tar.gz"
+          echo "3170fb709defebaba33e9755297d70dc3562220541de54fc3d494a8309ef1260  $RUNNER_TEMP/mpv-arm64.tar.gz" | shasum -a 256 -c -
+          tar -xzf "$RUNNER_TEMP/mpv-arm64.tar.gz" -C "$TOOL_ROOT/mpv"
+
+          WLECT="$(find "$TOOL_ROOT/szs" -type f -name wlect -print -quit)"
+          WIT="$(find "$TOOL_ROOT/wit" -type f -name wit -print -quit)"
+          test -n "$WLECT"
+          test -n "$WIT"
+          test -x "$WLECT"
+          test -x "$WIT"
+          file "$WLECT" "$WIT" "$TOOL_ROOT/ffmpeg/ffmpeg" "$TOOL_ROOT/mpv"/*/Contents/MacOS/mpv 2>/dev/null || true
+          "$WLECT" --version
+          "$WIT" --version
+
+          cat > "$TOOL_ROOT/THIRD_PARTY_NOTICES.txt" <<'NOTICE'
+          CTDM includes third-party command-line tools for a self-contained macOS experience.
+          Wiimms SZS Toolset v2.42a: https://szs.wiimm.de/ (source/downloads and licensing)
+          Wiimms ISO Tools v3.05a: https://wit.wiimm.de/ (source/downloads and licensing)
+          FFmpeg: https://github.com/binmgr/ffmpeg (static builds; GPL-2.0-or-later due to included components)
+          mpv: https://mpv.io/ (source and licensing)
+          NOTICE
+
       - name: Package app as ZIP and DMG
         env:
           APP_PATH: ${{ steps.app.outputs.app_path }}
