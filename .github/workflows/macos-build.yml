@@ -114,6 +114,28 @@ jobs:
           codesign --force --deep --sign - "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
+      - name: Verify bundled WIT after final signing
+        env:
+          APP_PATH: ${{ steps.app.outputs.app_path }}
+        run: |
+          set -euo pipefail
+          WIT="$(find "$APP_PATH/Contents/Resources/CTDM-tools/wit" -type f -name wit -print -quit)"
+          test -n "$WIT"
+          "$WIT" --version
+          codesign --verify --strict --verbose=2 "$WIT"
+
+      - name: Verify release is not App-Sandboxed
+        env:
+          APP_PATH: ${{ steps.app.outputs.app_path }}
+        run: |
+          set -euo pipefail
+          codesign -d --entitlements :- "$APP_PATH" > "$RUNNER_TEMP/app-entitlements.txt" 2>&1 || true
+          if grep -q 'com.apple.security.app-sandbox' "$RUNNER_TEMP/app-entitlements.txt"; then
+            echo "Release bundle still has App Sandbox enabled; embedded WIT needs normal access to the user-selected ISO/workspace."
+            cat "$RUNNER_TEMP/app-entitlements.txt"
+            exit 1
+          fi
+
       - name: Smoke-test app startup
         env:
           APP_PATH: ${{ steps.app.outputs.app_path }}

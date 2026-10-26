@@ -36,29 +36,88 @@ Future<int> extractIso(String source, String dest) async {
 
   final witPath = resolveWiimmTool('wit');
   final destination = Directory(dest);
+  final stdoutTail = <String>[];
+  final stderrTail = <String>[];
+  var availableSpace = 'unavailable';
+
   try {
     await Directory(path.dirname(dest)).create(recursive: true);
 
-    // Process.run captures stdout and stderr. The previous Process.start path
-    // never drained either pipe, which can hang on verbose WIT output and also
-    // discarded the useful reason when extraction failed.
-    final ProcessResult process = await Process.run(
+    // Record available space before a multi-gigabyte extraction. This check
+    // is diagnostic only: it never rejects a user's disk or ISO up front.
+    try {
+      final disk = await Process.run(
+        'df',
+        ['-Pk', path.dirname(dest)],
+        runInShell: false,
+      );
+      final rows = disk.stdout.toString().trim().split(RegExp(r'\r?\n'));
+      if (disk.exitCode == 0 && rows.length >= 2) {
+        final columns = rows.last.trim().split(RegExp(r'\s+'));
+        if (columns.length >= 4) {
+          final availableKiB = int.tryParse(columns[3]);
+          if (availableKiB != null) {
+            availableSpace =
+                '${(availableKiB / (1024 * 1024)).toStringAsFixed(2)} GiB';
+          }
+        }
+      }
+    } on Object {
+      // Keep going; inability to query disk space should not block extraction.
+    }
+
+    final sourceBytes = await sourceFile.length();
+    logString(
+      LogType.INFO,
+      'Starting WIT extraction. Source size: '
+      '${(sourceBytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GiB; '
+      'free disk space: $availableSpace; tool: $witPath',
+    );
+
+    // Stream both pipes instead of using Process.run: WIT may print a lot of
+    // output while traversing a Wii disc. Process.run buffers all of it in
+    // memory, while the streaming form drains the pipes and keeps only a
+    // bounded diagnostic tail.
+    final process = await Process.start(
       witPath,
       ['EXTRACT', '--source', source, '--DEST', dest],
       runInShell: false,
     );
 
-    final stdoutText = process.stdout.toString().trim();
-    final stderrText = process.stderr.toString().trim();
-    if (process.exitCode != 0 || !await destination.exists()) {
+    Future<void> drainOutput(
+      Stream<List<int>> stream,
+      List<String> tail,
+    ) async {
+      await for (final line
+          in stream.transform(utf8.decoder).transform(const LineSplitter())) {
+        if (tail.length >= 60) tail.removeAt(0);
+        tail.add(line);
+      }
+    }
+
+    final stdoutDone = drainOutput(process.stdout, stdoutTail);
+    final stderrDone = drainOutput(process.stderr, stderrTail);
+    final exitCode = await process.exitCode;
+    await Future.wait<void>([stdoutDone, stderrDone]);
+
+    if (exitCode != 0 || !await destination.exists()) {
       final details = [
         "Wiimm ISO Tool failed to extract the selected game image.",
-        "Exit code: ${process.exitCode}",
+        "Exit code: $exitCode",
+        if (exitCode == -9)
+          "WIT was terminated by SIGKILL (-9). This is not a normal WIT "
+              "error code. The app sandbox has been removed from this "
+              "desktop build so the helper can access the selected ISO; "
+              "streamed output and free disk space are included below.",
         "Tool: $witPath",
         "Source: $source",
+        "Source size: ${(sourceBytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GiB",
         "Destination: $dest",
-        if (stderrText.isNotEmpty) "WIT error: $stderrText",
-        if (stdoutText.isNotEmpty) "WIT output: $stdoutText",
+        "Free disk space before extraction: $availableSpace",
+        if (stderrTail.isNotEmpty)
+          "Last WIT error output:\n${stderrTail.join('\n')}",
+        if (stdoutTail.isNotEmpty)
+          "Last WIT output:\n${stdoutTail.join('\n')}",
       ].join("\n\n");
 
       logString(LogType.ERROR, "ERROR 1001: $details");
@@ -67,7 +126,7 @@ Future<int> extractIso(String source, String dest) async {
 
     final ProcessResult regionResult = await Process.run(
       witPath,
-      ['dump', source, '--show', 'D-ID'],
+      ['DUMP', source, '--show', 'D-ID'],
       runInShell: false,
     );
     if (regionResult.exitCode != 0) {
@@ -100,14 +159,14 @@ Future<int> extractIso(String source, String dest) async {
         }
       }
     }
-    return process.exitCode;
+    return exitCode;
   } on CtdmException {
     rethrow;
   } on ProcessException catch (error) {
     final details =
         "Could not launch Wiimm ISO Tool.\n\nExecutable: $witPath\n"
         "Reason: ${error.message}\n"
-        "Confirm that the app contains a working bundled copy of WIT.";
+        "Confirm that the bundled WIT executable can start.";
     logString(LogType.ERROR, "ERROR 1001: $details");
     throw CtdmException(details, StackTrace.current, "1001");
   } on FileSystemException catch (error) {
@@ -118,7 +177,6 @@ Future<int> extractIso(String source, String dest) async {
     throw CtdmException(details, StackTrace.current, "1001");
   }
 }
-
 class _PackSelectState extends State<PackSelect> {
   late SharedPreferences prefs;
   late String workspace = "";
