@@ -14,6 +14,7 @@ import 'package:ctdm/utils/character_utiles.dart';
 import 'package:ctdm/utils/filepath_utils.dart';
 import 'package:ctdm/utils/gecko_utils.dart';
 import 'package:ctdm/utils/log_utils.dart';
+import 'package:ctdm/utils/wiimm_tools.dart';
 import 'package:ctdm/utils/music_utils.dart';
 import 'package:ctdm/utils/output_utils.dart';
 import 'package:flutter/material.dart';
@@ -514,7 +515,7 @@ class _PatchWindowState extends State<PatchWindow> {
 
       //  wlect patch lecode-PAL.bin -od lecode-PAL.bin --le-define config.txt --track-dir .
 
-      ProcessResult p = await Process.run('wlect', wlectArgs, runInShell: true);
+      ProcessResult p = await Process.run(resolveWiimmTool('wlect'), wlectArgs, runInShell: true);
 
       if (p.exitCode != 0 || p.stderr.toString().contains('! wlect')) {
         logString(LogType.ERROR, "PATCH ERROR:\n${p.stderr}");
@@ -670,7 +671,7 @@ class _PatchWindowState extends State<PatchWindow> {
       Directory extractedSzs =
           Directory("${path.join(packPath, 'Scene', 'UI', baseName)}.d");
       await Process.run(
-          'wszst',
+          resolveWiimmTool('wszst'),
           [
             'extract',
             path.join(packPath, 'Scene', 'UI', baseName),
@@ -704,7 +705,7 @@ class _PatchWindowState extends State<PatchWindow> {
       //since we are here, we can patch the icons
 
       await Process.run(
-          'wszst',
+          resolveWiimmTool('wszst'),
           [
             'patch',
             '--le-menu',
@@ -791,7 +792,7 @@ class _PatchWindowState extends State<PatchWindow> {
           .copy(path.join(packPath, 'Scene', 'Model', 'Driver.szs'));
 
       await Process.run(
-          'wszst',
+          resolveWiimmTool('wszst'),
           [
             'extract',
             path.join(packPath, 'Demo', 'Award.szs'),
@@ -801,7 +802,7 @@ class _PatchWindowState extends State<PatchWindow> {
           runInShell: true);
 
       await Process.run(
-          'wszst',
+          resolveWiimmTool('wszst'),
           [
             'extract',
             path.join(packPath, 'Scene', 'Model', 'Driver.szs'),
@@ -927,7 +928,7 @@ class _PatchWindowState extends State<PatchWindow> {
                 '$pathOfCustomDir does not contain karts folder. skipping.');
           }
           await Process.run(
-              'wszst',
+              resolveWiimmTool('wszst'),
               [
                 'create',
                 path.join(packPath, 'Demo', 'Award.szs.d'),
@@ -937,7 +938,7 @@ class _PatchWindowState extends State<PatchWindow> {
               ],
               runInShell: true);
           await Process.run(
-              'wszst',
+              resolveWiimmTool('wszst'),
               [
                 'create',
                 path.join(packPath, 'Scene', 'Model', 'Driver.szs.d'),
@@ -1384,7 +1385,7 @@ Future<File> extractSzsAndDecode(
     String packPath, Directory parentDir, String basename) async {
   String dirPath = path.join(parentDir.path, "$basename.d");
   await Process.run(
-      'wszst', ['extract', path.join(parentDir.path, basename), '-D', dirPath],
+      resolveWiimmTool('wszst'), ['extract', path.join(parentDir.path, basename), '-D', dirPath],
       runInShell: true);
 
   await Process.run(
@@ -1412,7 +1413,7 @@ Future<void> encodeAndClose(File commonTxt, File f) async {
       runInShell: true);
 
   await Process.run(
-      'wszst',
+      resolveWiimmTool('wszst'),
       [
         'create',
         path.join(path.dirname(f.path), "${path.basename(f.path)}.d"),
