@@ -10,7 +10,25 @@ String resolveWiimmTool(String executable) {
   if (!Platform.isMacOS) return executable;
 
   final home = Platform.environment['HOME'];
-  final roots = <String>[
+
+  // Prefer the tested copies shipped inside CTDM.app. This makes the macOS
+  // distribution self-contained and avoids false "toolset missing" errors
+  // caused by Finder's restricted PATH or a user's unrelated tool version.
+  final executableDirectory = path.dirname(Platform.resolvedExecutable);
+  final contentsDirectory = path.dirname(executableDirectory);
+  final bundledRoot = path.join(contentsDirectory, 'Resources', 'CTDM-tools');
+  final List<String> bundledRoots;
+  if (executable == 'wit' || executable == 'wwt' || executable == 'wdf') {
+    bundledRoots = [path.join(bundledRoot, 'wit')];
+  } else if (executable == 'ffmpeg' || executable == 'ffprobe') {
+    bundledRoots = [path.join(bundledRoot, 'ffmpeg')];
+  } else if (executable == 'mpv') {
+    bundledRoots = [path.join(bundledRoot, 'mpv')];
+  } else {
+    bundledRoots = [path.join(bundledRoot, 'szs')];
+  }
+
+  final userRoots = <String>[
     if (home != null && home.isNotEmpty)
       path.join(home, 'Tools', 'WiimmSZS'),
     if (home != null && home.isNotEmpty)
@@ -21,7 +39,7 @@ String resolveWiimmTool(String executable) {
       path.join(home, 'Tools', 'FFmpeg'),
   ];
 
-  for (final root in roots) {
+  for (final root in [...bundledRoots, ...userRoots]) {
     final directory = Directory(root);
     if (!directory.existsSync()) continue;
 
