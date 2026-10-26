@@ -21,7 +21,6 @@ concurrency:
 
 jobs:
   build-macos:
-    # macos-15 is an Apple Silicon hosted runner; build an arm64-native app.
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -47,15 +46,21 @@ jobs:
       - name: Build macOS app
         run: flutter build macos --release
 
-      - name: Verify app bundle
+      - name: Locate and verify app bundle
+        id: app
         run: |
-          test -d build/macos/Build/Products/Release/ctdm.app
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' build/macos/Build/Products/Release/ctdm.app/Contents/Info.plist
-          file build/macos/Build/Products/Release/ctdm.app/Contents/MacOS/*
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP_PATH"
+          test -f "$APP_PATH/Contents/Info.plist"
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Contents/Info.plist"
+          file "$APP_PATH"/Contents/MacOS/*
 
       - name: Package app
+        env:
+          APP_PATH: ${{ steps.app.outputs.app_path }}
         run: |
-          ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/ctdm.app CTDM-macOS-arm64.zip
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" CTDM-macOS-arm64.zip
           shasum -a 256 CTDM-macOS-arm64.zip
 
       - name: Upload app bundle
