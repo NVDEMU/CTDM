@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ctdm-macos-${{ github.ref }}
@@ -44,14 +44,21 @@ jobs:
         run: flutter pub get
 
       - name: Build macOS app
-        run: flutter build macos --release
+        run: flutter build macos --release -t lib/studio_main.dart
 
       - name: Locate and verify app bundle
         id: app
         run: |
-          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -type d -name '*.app' -print -quit)"
-          test -n "$APP_PATH"
+          APP_DIR="build/macos/Build/Products/Release"
+          SOURCE_APP="$(find "$APP_DIR" -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$SOURCE_APP"
+          APP_PATH="$APP_DIR/MKW Distribution Maker.app"
+          if [ "$SOURCE_APP" != "$APP_PATH" ]; then mv "$SOURCE_APP" "$APP_PATH"; fi
           test -f "$APP_PATH/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleName "MKW Distribution Maker"' "$APP_PATH/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName "MKW Distribution Maker"' "$APP_PATH/Contents/Info.plist" || /usr/libexec/PlistBuddy -c 'Add :CFBundleDisplayName string "MKW Distribution Maker"' "$APP_PATH/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.nvdemu.mkwdistributionmaker' "$APP_PATH/Contents/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$APP_PATH/Contents/Info.plist")" = "MKW Distribution Maker"
           echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Contents/Info.plist"
           file "$APP_PATH"/Contents/MacOS/*
@@ -101,17 +108,56 @@ jobs:
         env:
           APP_PATH: ${{ steps.app.outputs.app_path }}
         run: |
-          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" CTDM-macOS-arm64.zip
-          hdiutil create -volname "CTDM" -srcfolder "$APP_PATH" -ov -format UDZO CTDM-macOS-arm64.dmg
-          shasum -a 256 CTDM-macOS-arm64.zip CTDM-macOS-arm64.dmg
-          du -sh "$APP_PATH" CTDM-macOS-arm64.zip CTDM-macOS-arm64.dmg
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" MKW-Distribution-Maker-macOS-arm64.zip
+          hdiutil create -volname "MKW Distribution Maker" -srcfolder "$APP_PATH" -ov -format UDZO MKW-Distribution-Maker-macOS-arm64.dmg
+          shasum -a 256 MKW-Distribution-Maker-macOS-arm64.zip MKW-Distribution-Maker-macOS-arm64.dmg
+          du -sh "$APP_PATH" MKW-Distribution-Maker-macOS-arm64.zip MKW-Distribution-Maker-macOS-arm64.dmg
 
       - name: Upload macOS app packages
         uses: actions/upload-artifact@v4
         with:
-          name: CTDM-macOS-arm64
+          name: MKW-Distribution-Maker-macOS-arm64
           path: |
-            CTDM-macOS-arm64.zip
-            CTDM-macOS-arm64.dmg
+            MKW-Distribution-Maker-macOS-arm64.zip
+            MKW-Distribution-Maker-macOS-arm64.dmg
           if-no-files-found: error
           retention-days: 14
+      - name: Move rolling Nightly tag to this commit
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = 'tags/mkw-distribution-maker-nightly';
+            try {
+              await github.rest.git.getRef({ owner: context.repo.owner, repo: context.repo.repo, ref });
+              await github.rest.git.updateRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref,
+                sha: context.sha,
+                force: true
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'refs/' + ref,
+                sha: context.sha
+              });
+            }
+
+      - name: Publish rolling Nightly release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mkw-distribution-maker-nightly
+          name: Nightly
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            MKW-Distribution-Maker-macOS-arm64.zip
+            MKW-Distribution-Maker-macOS-arm64.dmg
+
