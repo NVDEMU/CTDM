@@ -17,39 +17,106 @@ class PackSelect extends StatefulWidget {
 }
 
 Future<int> extractIso(String source, String dest) async {
-  if (source == "" || dest == "") {
-    return 1;
+  if (source.trim().isEmpty || dest.trim().isEmpty) {
+    throw CtdmException(
+      "Select a game image and choose a valid workspace before extracting.",
+      StackTrace.current,
+      "1001",
+    );
   }
-  final process =
-      await Process.start(resolveWiimmTool('wit'), ['EXTRACT', source, dest], runInShell: true);
-  final exitCode = await process.exitCode;
-  if (exitCode != 0) {
-    logString(LogType.ERROR, "ERROR 1001: cannot extract $source to $dest");
-    throw CtdmException("Cannot extract $source to ORIGINAL DISC folder",
-        StackTrace.current, "1001");
-  }
-  ProcessResult checkKoreanIso = await Process.run(
-      resolveWiimmTool('wit'), ['dump', source, '--show', 'D-ID'],
-      runInShell: true);
-  if (checkKoreanIso.stdout.toString().contains('RMCK01')) {
-    String originalDiscPath = dest;
-    if (await Directory(path.join(originalDiscPath, 'DATA')).exists()) {
-      originalDiscPath = path.join(originalDiscPath, 'DATA');
-    }
-    Directory sceneDir =
-        Directory(path.join(originalDiscPath, 'files', 'Scene', 'UI'));
 
-    await sceneDir
-        .list()
-        .where((systemEntity) =>
-            path.basename(systemEntity.path).contains('_R.szs'))
-        .forEach((file) async {
-      File tmp = file as File;
-      await tmp.copy(tmp.path.replaceAll('_R', ''));
-      await tmp.delete();
-    });
+  final sourceFile = File(source);
+  if (!await sourceFile.exists()) {
+    throw CtdmException(
+      "The selected game image no longer exists. Select the ISO/WBFS again.\n\n$source",
+      StackTrace.current,
+      "1001",
+    );
   }
-  return exitCode;
+
+  final witPath = resolveWiimmTool('wit');
+  final destination = Directory(dest);
+  try {
+    await Directory(path.dirname(dest)).create(recursive: true);
+
+    // Process.run captures stdout and stderr. The previous Process.start path
+    // never drained either pipe, which can hang on verbose WIT output and also
+    // discarded the useful reason when extraction failed.
+    final ProcessResult process = await Process.run(
+      witPath,
+      ['EXTRACT', source, dest],
+      runInShell: false,
+    );
+
+    final stdoutText = process.stdout.toString().trim();
+    final stderrText = process.stderr.toString().trim();
+    if (process.exitCode != 0 || !await destination.exists()) {
+      final details = [
+        "Wiimm ISO Tool failed to extract the selected game image.",
+        "Exit code: ${process.exitCode}",
+        "Tool: $witPath",
+        "Source: $source",
+        "Destination: $dest",
+        if (stderrText.isNotEmpty) "WIT error: $stderrText",
+        if (stdoutText.isNotEmpty) "WIT output: $stdoutText",
+      ].join("\n\n");
+
+      logString(LogType.ERROR, "ERROR 1001: $details");
+      throw CtdmException(details, StackTrace.current, "1001");
+    }
+
+    final ProcessResult regionResult = await Process.run(
+      witPath,
+      ['dump', source, '--show', 'D-ID'],
+      runInShell: false,
+    );
+    if (regionResult.exitCode != 0) {
+      logString(
+        LogType.WARNING,
+        "Could not detect game region after extraction: "
+        "${regionResult.stderr}",
+      );
+    }
+
+    if (regionResult.stdout.toString().contains('RMCK01')) {
+      String originalDiscPath = dest;
+      if (await Directory(path.join(originalDiscPath, 'DATA')).exists()) {
+        originalDiscPath = path.join(originalDiscPath, 'DATA');
+      }
+      final sceneDir = Directory(
+        path.join(originalDiscPath, 'files', 'Scene', 'UI'),
+      );
+
+      if (await sceneDir.exists()) {
+        final files = await sceneDir.list().toList();
+        for (final entity in files) {
+          if (entity is! File ||
+              !path.basename(entity.path).contains('_R.szs')) {
+            continue;
+          }
+          final targetPath = entity.path.replaceAll('_R.szs', '.szs');
+          await entity.copy(targetPath);
+          await entity.delete();
+        }
+      }
+    }
+    return process.exitCode;
+  } on CtdmException {
+    rethrow;
+  } on ProcessException catch (error) {
+    final details =
+        "Could not launch Wiimm ISO Tool.\n\nExecutable: $witPath\n"
+        "Reason: ${error.message}\n"
+        "Confirm that the app contains a working bundled copy of WIT.";
+    logString(LogType.ERROR, "ERROR 1001: $details");
+    throw CtdmException(details, StackTrace.current, "1001");
+  } on FileSystemException catch (error) {
+    final details =
+        "Could not write the extracted game files.\n\n"
+        "Destination: $dest\nReason: ${error.message}";
+    logString(LogType.ERROR, "ERROR 1001: $details");
+    throw CtdmException(details, StackTrace.current, "1001");
+  }
 }
 
 class _PackSelectState extends State<PackSelect> {
