@@ -278,7 +278,7 @@ Future<String> createBMGList(String packPath) async {
         '--dest',
         path.join(packPath, 'Scene', 'UI', 'tracks.bmg.txt')
       ],
-      runInShell: true);
+      runInShell: false);
 
   if (p.exitCode != 0) {
     logString(LogType.ERROR, "PATCH ERROR:\n${p.stderr}");
@@ -515,7 +515,7 @@ class _PatchWindowState extends State<PatchWindow> {
 
       //  wlect patch lecode-PAL.bin -od lecode-PAL.bin --le-define config.txt --track-dir .
 
-      ProcessResult p = await Process.run(resolveWiimmTool('wlect'), wlectArgs, runInShell: true);
+      ProcessResult p = await Process.run(resolveWiimmTool('wlect'), wlectArgs, runInShell: false);
 
       if (p.exitCode != 0 || p.stderr.toString().contains('! wlect')) {
         logString(LogType.ERROR, "PATCH ERROR:\n${p.stderr}");
@@ -678,7 +678,7 @@ class _PatchWindowState extends State<PatchWindow> {
             '--dest',
             extractedSzs.path
           ],
-          runInShell: true);
+          runInShell: false);
       if (await File(
               path.join(extractedSzs.path, 'button', 'timg', 'ct_icons.tpl'))
           .exists()) {
@@ -717,7 +717,7 @@ class _PatchWindowState extends State<PatchWindow> {
             '--dest',
             path.join(packPath, 'Scene', 'UI', baseName),
           ],
-          runInShell: true);
+          runInShell: false);
     }
 
     //edit the Common.bmg of some Scenes
@@ -799,7 +799,7 @@ class _PatchWindowState extends State<PatchWindow> {
             '--dest',
             "${path.join(packPath, 'Demo', 'Award.szs')}.d",
           ],
-          runInShell: true);
+          runInShell: false);
 
       await Process.run(
           resolveWiimmTool('wszst'),
@@ -809,7 +809,7 @@ class _PatchWindowState extends State<PatchWindow> {
             '--dest',
             "${path.join(packPath, 'Scene', 'Model', 'Driver.szs')}.d",
           ],
-          runInShell: true);
+          runInShell: false);
 
       List<String> customStrings = customTxtContent
           .where((element) => element.split(';')[1].trim().isNotEmpty)
@@ -936,7 +936,7 @@ class _PatchWindowState extends State<PatchWindow> {
                 '--dest',
                 path.join(packPath, 'Demo', 'Award.szs'),
               ],
-              runInShell: true);
+              runInShell: false);
           await Process.run(
               resolveWiimmTool('wszst'),
               [
@@ -946,7 +946,7 @@ class _PatchWindowState extends State<PatchWindow> {
                 '--dest',
                 path.join(packPath, 'Scene', 'Model', 'Driver.szs'),
               ],
-              runInShell: true);
+              runInShell: false);
         }
       }
     }
@@ -1386,7 +1386,7 @@ Future<File> extractSzsAndDecode(
   String dirPath = path.join(parentDir.path, "$basename.d");
   await Process.run(
       resolveWiimmTool('wszst'), ['extract', path.join(parentDir.path, basename), '-D', dirPath],
-      runInShell: true);
+      runInShell: false);
 
   await Process.run(
       resolveWiimmTool('wbmgt'),
@@ -1396,7 +1396,7 @@ Future<File> extractSzsAndDecode(
         '--dest',
         path.join(dirPath, 'message', 'Common.txt'),
       ],
-      runInShell: true);
+      runInShell: false);
   return File(path.join(dirPath, 'message', 'Common.txt'));
 }
 
@@ -1410,7 +1410,7 @@ Future<void> encodeAndClose(File commonTxt, File f) async {
         '--dest',
         path.join(path.dirname(commonTxt.path), 'Common.bmg')
       ],
-      runInShell: true);
+      runInShell: false);
 
   await Process.run(
       resolveWiimmTool('wszst'),
@@ -1421,7 +1421,7 @@ Future<void> encodeAndClose(File commonTxt, File f) async {
         '--dest',
         f.path,
       ],
-      runInShell: true);
+      runInShell: false);
 }
 
 // ignore: must_be_immutable
