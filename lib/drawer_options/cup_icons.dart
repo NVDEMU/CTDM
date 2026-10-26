@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:ctdm/utils/log_utils.dart';
+import 'package:ctdm/utils/wiimm_tools.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:url_launcher/url_launcher_string.dart';
@@ -51,12 +52,12 @@ int getNumberOfIconsFromConfig(String packPath) {
     try {
       //wlect config config.txt
       final process = Process.runSync(
-          'wlect',
+          resolveWiimmTool('wlect'),
           [
             'dump',
             path.join(packPath, 'config.txt'),
           ],
-          runInShell: true);
+          runInShell: false);
 
       String result = process.stdout;
       return int.parse(result
