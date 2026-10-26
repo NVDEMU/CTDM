@@ -200,7 +200,7 @@ Future<File> audioToWavAdpcm(
         'pcm_s16le',
         tmpFilePath
       ],
-      runInShell: true);
+      runInShell: false);
   return File(tmpFilePath);
 }
 
@@ -216,7 +216,7 @@ Future<File> createFastCopy(String tmpFilePath, String tmpFilePathFast) async {
         '-vn',
         tmpFilePathFast
       ],
-      runInShell: true);
+      runInShell: false);
   return File(tmpFilePathFast);
 }
 
@@ -396,7 +396,7 @@ Future<double> getMaxVolumePeak(File input) async {
         'null',
         '/dev/null'
       ],
-      runInShell: true);
+      runInShell: false);
   double maxVolume = double.parse(p.stderr
       .toString()
       .split("max_volume:")[1]
@@ -437,7 +437,7 @@ Future<File> _runCommandToNormalize(
       outputFilePath,
     ];
 
-    await Process.run(ffmpegPath, ffmpegArgs, runInShell: true);
+    await Process.run(ffmpegPath, ffmpegArgs, runInShell: false);
   } catch (e) {
     logString(
         LogType.ERROR, "ERROR 5503: Cannot parse ffmpeg.\n${e.toString()}");
