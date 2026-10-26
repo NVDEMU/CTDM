@@ -104,6 +104,32 @@ jobs:
           mpv: https://mpv.io/ (source and licensing)
           NOTICE
 
+      - name: Re-sign and verify modified app bundle
+        env:
+          APP_PATH: ${{ steps.app.outputs.app_path }}
+        run: |
+          set -euo pipefail
+          # The workflow renames the app and adds bundled tools after Flutter's
+          # build, invalidating the original signature. Sign the final bundle.
+          codesign --force --deep --sign - "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+      - name: Smoke-test app startup
+        env:
+          APP_PATH: ${{ steps.app.outputs.app_path }}
+        run: |
+          set -euo pipefail
+          echo "Launching $APP_PATH"
+          open -n "$APP_PATH"
+          sleep 8
+          if ! pgrep -x ctdm >/dev/null; then
+            echo "The app exited during startup. Recent macOS crash reports:"
+            find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -type f -mmin -5 -print 2>/dev/null || true
+            exit 1
+          fi
+          APP_PID="$(pgrep -n -x ctdm)"
+          kill "$APP_PID" || true
+
       - name: Package app as ZIP and DMG
         env:
           APP_PATH: ${{ steps.app.outputs.app_path }}

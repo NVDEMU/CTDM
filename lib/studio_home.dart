@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'settings.dart' show defaultSettingsValues;
+import 'utils/wiimm_tools.dart';
 
 import 'pack_select.dart' show PackSelect, extractIso;
 
@@ -31,24 +33,67 @@ class _StudioHomeState extends State<StudioHome> {
   }
 
   Future<void> _refresh() async {
-    final prefs = await SharedPreferences.getInstance();
-    final workspace = prefs.getString('workspace') ?? '';
-    final gameImage = prefs.getString('game') ?? '';
-    final ready = workspace.isNotEmpty &&
-        Directory(path.join(workspace, 'ORIGINAL_DISC')).existsSync();
+    try {
+      final prefs = await SharedPreferences.getInstance();
 
-    if (!mounted) return;
-    setState(() {
-      _workspace = workspace;
-      _gameImage = gameImage;
-      _discReady = ready;
-      _loading = false;
-      if (ready) {
-        _message = 'Game files are prepared. You can start building.';
-      } else if (workspace.isNotEmpty) {
-        _message = 'Workspace is ready. Select your Mario Kart Wii image next.';
+      // Initialize preferences after the UI is alive. Guard all setup to
+      // prevent a plugin or preference error from terminating app startup.
+      await prefs.setString('version', 'v1.0.0');
+      if (!prefs.containsKey('profile')) {
+        await prefs.setString('profile', '');
       }
-    });
+      if (!prefs.containsKey('download_already_check')) {
+        await prefs.setBool('download_already_check', false);
+      }
+      for (final entry in defaultSettingsValues.entries) {
+        if (prefs.containsKey(entry.key)) continue;
+        if (entry.value is bool) {
+          await prefs.setBool(entry.key, entry.value as bool);
+        } else {
+          await prefs.setString(entry.key, entry.value.toString());
+        }
+      }
+
+      // Do not spawn command-line processes during startup. The CI build
+      // smoke-tests the bundled executables; presence is enough for the UI.
+      await prefs.setBool(
+        'szs',
+        File(resolveWiimmTool('wlect')).existsSync(),
+      );
+      await prefs.setBool(
+        'wit',
+        File(resolveWiimmTool('wit')).existsSync(),
+      );
+
+      final workspace = prefs.getString('workspace') ?? '';
+      final gameImage = prefs.getString('game') ?? '';
+      final ready = workspace.isNotEmpty &&
+          Directory(path.join(workspace, 'ORIGINAL_DISC')).existsSync();
+
+      if (!mounted) return;
+      setState(() {
+        _workspace = workspace;
+        _gameImage = gameImage;
+        _discReady = ready;
+        _loading = false;
+        if (ready) {
+          _message = 'Game files are prepared. You can start building.';
+        } else if (workspace.isNotEmpty) {
+          _message = 'Workspace is ready. Select your Mario Kart Wii image next.';
+        } else {
+          _message = 'Choose a workspace to get started.';
+        }
+      });
+    } on Object catch (error, stackTrace) {
+      debugPrint('MKW Distribution Maker startup setup failed: $error\n$stackTrace');
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _discReady = false;
+        _message = 'Startup setup failed: $error';
+      });
+      _showMessage('Startup setup failed. Diagnostic details were sent to startup.log.');
+    }
   }
 
   void _showMessage(String message) {

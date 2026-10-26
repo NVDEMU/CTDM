@@ -1,54 +1,59 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import 'settings.dart' show defaultSettingsValues;
 import 'studio_home.dart';
-import 'utils/wiimm_tools.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+void main() {
+  runZonedGuarded<void>(() {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('version', 'v1.0.0');
-  await prefs.setString('profile', '');
-  await prefs.setBool('download_already_check', false);
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      _recordStartupError(
+        details.exception,
+        details.stack ?? StackTrace.current,
+      );
+    };
 
-  // Seed the same settings used by CTDM's proven pack-building backend.
-  for (final entry in defaultSettingsValues.entries) {
-    if (prefs.containsKey(entry.key)) continue;
-    if (entry.value is bool) {
-      await prefs.setBool(entry.key, entry.value as bool);
-    } else {
-      await prefs.setString(entry.key, entry.value.toString());
-    }
-  }
+    PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+      _recordStartupError(error, stack);
+      return true;
+    };
 
-  // Check the copies bundled inside the app, but don't block the UI if a
-  // packaging problem exists; the builder can show the actionable error.
+    // Render immediately. Preferences and tool checks happen after the first
+    // frame so a plugin or subprocess failure cannot block initial UI startup.
+    runApp(const MKWDistributionMakerApp());
+  }, (Object error, StackTrace stack) {
+    _recordStartupError(error, stack);
+  });
+}
+
+void _recordStartupError(Object error, StackTrace stack) {
   try {
-    final result = await Process.run(
-      resolveWiimmTool('wlect'),
-      ['--version'],
-      runInShell: false,
+    final home = Platform.environment['HOME'];
+    if (home == null || home.isEmpty) return;
+    final logDirectory = Directory(
+      '$home/Library/Logs/MKW Distribution Maker',
     );
-    await prefs.setBool('szs', result.exitCode == 0);
-  } on Object {
-    await prefs.setBool('szs', false);
-  }
-  try {
-    final result = await Process.run(
-      resolveWiimmTool('wit'),
-      ['--version'],
-      runInShell: false,
+    logDirectory.createSync(recursive: true);
+    final file = File(logDirectory.path + '/startup.log');
+    file.writeAsStringSync(
+      '[' +
+          DateTime.now().toIso8601String() +
+          '] ' +
+          error.toString() +
+          '\n' +
+          stack.toString() +
+          '\n',
+      mode: FileMode.append,
+      flush: true,
     );
-    await prefs.setBool('wit', result.exitCode == 0);
   } on Object {
-    await prefs.setBool('wit', false);
+    // Error reporting must never cause a second startup failure.
   }
-
-  runApp(const MKWDistributionMakerApp());
 }
 
 class MKWDistributionMakerApp extends StatelessWidget {
